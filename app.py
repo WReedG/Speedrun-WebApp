@@ -14,6 +14,12 @@ def index():
     output += """<p> Submit a run <a href="/add">here!</a></p> """
 
     for run in all_runs:
+        verified = None
+        if run['verified']:
+            verified = "&#x2705;"
+        else:
+            verified = "&#x274C;"
+
         output += f"""
             <div>
             {run['game_name']} |
@@ -21,10 +27,11 @@ def index():
             {run['time_seconds']} sec | 
             <a href="{run['video_url']}" target="_blank">Video</a> |
             {run['submission_date']} |
-            {run['verified']} |
+            {verified} |
             <form action="/delete/{run['run_id']}" method="POST" style="display: inline;">
                 <button type="submit">Delete</button>
-            </form>
+            </form> |
+            <a href="/edit/{run['run_id']}">Edit</a>
             </div>
         """
 
@@ -57,19 +64,24 @@ def add_run():
         # Confirmation message for a submitted run
         conn = get_db_connection()
         cursor = conn.cursor()
-        query = "INSERT INTO runs (game_name, player_name, time_seconds, video_url, submission_date, verified) VALUES (?, ?, ?, ?, ?, ?)"
+        query = ("INSERT INTO runs (game_name, player_name, time_seconds, video_url, submission_date, verified) "
+                 "VALUES (?, ?, ?, ?, ?, ?)")
         cur_date = datetime.now().strftime("%m/%d/%Y")
         video_url = request.form.get("video_url")
         if not video_url.startswith(("http://", "https://")):
             video_url = "https://" + video_url
-        data = (request.form.get("game_name"), request.form.get("player_name"), int(request.form.get("time_seconds")),
-                video_url, cur_date, 0)
+        data = (
+            request.form.get("game_name"),
+            request.form.get("player_name"),
+            int(request.form.get("time_seconds")),
+            video_url,
+            cur_date,
+            0
+        )
         cursor.execute(query, data)
         conn.commit()
         conn.close()
-        output = "<p>Run submitted! Thank you for submitting a run, please return to the home page to view it.</p>"
-        output += """<p> Click <a href="/">here</a> to return to the main page! </p>"""
-        return output
+        return redirect(url_for('index'))
 
 @app.route("/delete/<int:run_id>", methods=["POST"])
 def delete_run(run_id):
@@ -80,6 +92,56 @@ def delete_run(run_id):
     conn.commit()
     conn.close()
     return redirect(url_for('index'))
+
+@app.route("/edit/<int:run_id>", methods=["GET", "POST"])
+def edit_run(run_id):
+    if request.method == "GET":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,))
+        data = cursor.fetchone()
+        conn.close()
+        output = f"""
+            <form action="/edit/{run_id}" method="POST">
+                <label for="game_name">Game Name:</label>
+                <input type="text" name="game_name" id="game_name" value="{data['game_name']}"><br><br>
+
+                <label for="player_name">Player Username:</label>
+                <input type="text" name="player_name" id="player_name" value="{data['player_name']}"><br><br>
+
+                <label for="time_seconds">Time (in seconds):</label>
+                <input type="text" name="time_seconds" id="time_seconds" value="{data['time_seconds']}"><br><br>
+
+                <label for="video_url">Video Link:</label>
+                <input type="text" name="video_url" id="video_url" value="{data['video_url']}"><br><br>
+
+                <input type="submit" value="Submit">
+            </form>
+            <p>Click <a href="/">here</a> to return to the main page. </p>
+        """
+        return output
+    else:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = """
+        UPDATE runs 
+        SET game_name = ?, player_name = ?, time_seconds = ?, video_url = ? 
+        WHERE run_id = ?
+        """
+        video_url = request.form.get("video_url")
+        if not video_url.startswith(("http://", "https://")):
+            video_url = "https://" + video_url
+        data = (
+            request.form.get("game_name"),
+            request.form.get("player_name"),
+            int(request.form.get("time_seconds")),
+            video_url,
+            run_id
+        )
+        cursor.execute(query, data)
+        conn.commit()
+        conn.close()
+        return redirect(url_for('index'))
 
  # Helper funtion to create a connection to the main db.
 def get_db_connection():
