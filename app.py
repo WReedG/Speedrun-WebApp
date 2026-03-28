@@ -12,6 +12,7 @@ def index():
 
     output = "<h1> Speedrun Leaderboard</h1><p></p>"
     output += """<p> Submit a run <a href="/add">here!</a></p> """
+    output += """<form action="/report" method="GET"><button type="submit">Search</button></form>           """
 
     for run in all_runs:
         verified = None
@@ -152,6 +153,101 @@ def edit_run(run_id):
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
+
+@app.route("/report", methods=["GET", "POST"])
+def report():
+    if request.method == "GET":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT game_name FROM runs")
+        games = cursor.fetchall()  # List of rows where each row is a game
+        conn.close()
+        output = """
+        <h1> Search </h1>
+        <form action="/report" method="POST">
+        
+        <label for="game_name">Game Name:</label>
+        <select name="game_name">
+            <option value="">All Games</option>
+        """
+        for game in games:
+            output += f'<option value="{game["game_name"]}">{game["game_name"]}</option>'
+        output += """
+        </select>
+        <br>
+        <label for="verified">Verification Status</label>
+        <select name="verified">
+            <option value="">All</option>
+            <option value="1">Verified</option>
+            <option value="0">Unverified</option>
+        </select>
+        <br>
+        <button type="submit">Search</button>
+        </form>
+        <a href="/">Return</a>
+        """
+        return output
+    else:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT * FROM runs WHERE 1=1"
+        params = []
+        game_name = request.form.get("game_name")
+        if game_name and game_name != "":  # empty string or None = All
+            query += " AND game_name = ?"
+            params.append(game_name)
+
+        verified = request.form.get("verified")
+        if verified in ("0", "1"):
+            query += " AND verified = ?"
+            params.append(int(verified))
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        count = len(rows)
+        if count > 0:
+            average = sum(row['time_seconds'] for row in rows) / len(rows)
+            fastest = min(row['time_seconds'] for row in rows)
+            slowest = max(row['time_seconds'] for row in rows)
+        else:
+            average = "N/A"
+            fastest = "N/A"
+            slowest = "N/A"
+
+        output = f"""
+        <h1> Search Results </h1>
+        <div> <h3>
+        Count: {count} runs | 
+        Average: {average} seconds | 
+        Fastest: {fastest} seconds | 
+        Slowest: {slowest} seconds </h3> </div>
+        <br>
+        """
+        if count == 0:
+            output += "<p>No runs match your search criteria.</p>"
+        for run in rows:
+            verified = None
+            if run['verified']:
+                verified = "&#x2705;"
+            else:
+                verified = "&#x274C;"
+
+            output += f"""
+                <div>
+                {run['game_name']} |
+                {run['player_name']} |
+                {run['time_seconds']} sec | 
+                <a href="{run['video_url']}" target="_blank">Video</a> |
+                {run['submission_date']} |
+                {verified}
+                </div>
+            """
+        output += """
+        <a href="/report">Search Again</a><br>
+        <a href="/">Return to Main Page</a>
+        """
+        return output
 
  # Helper funtion to create a connection to the main db.
 def get_db_connection():
