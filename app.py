@@ -101,6 +101,7 @@ def edit_run(run_id):
         cursor.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,))
         data = cursor.fetchone()
         conn.close()
+        checkmark = "checked" if data['verified'] else ""
         output = f"""
             <form action="/edit/{run_id}" method="POST">
                 <label for="game_name">Game Name:</label>
@@ -114,6 +115,9 @@ def edit_run(run_id):
 
                 <label for="video_url">Video Link:</label>
                 <input type="text" name="video_url" id="video_url" value="{data['video_url']}"><br><br>
+                
+                <label for="verified">Verified Run:</label>
+                <input type="checkbox" name="verified" id="verified" {checkmark}><br><br>
 
                 <input type="submit" value="Submit">
             </form>
@@ -125,17 +129,23 @@ def edit_run(run_id):
         cursor = conn.cursor()
         query = """
         UPDATE runs 
-        SET game_name = ?, player_name = ?, time_seconds = ?, video_url = ? 
+        SET game_name = ?, player_name = ?, time_seconds = ?, video_url = ? , verified = ?
         WHERE run_id = ?
         """
         video_url = request.form.get("video_url")
         if not video_url.startswith(("http://", "https://")):
             video_url = "https://" + video_url
+        if request.form.get("verified") is not None:
+            verified = 1
+        else:
+            verified = 0
+
         data = (
             request.form.get("game_name"),
             request.form.get("player_name"),
             int(request.form.get("time_seconds")),
             video_url,
+            verified,
             run_id
         )
         cursor.execute(query, data)
