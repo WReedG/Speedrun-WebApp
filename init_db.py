@@ -15,6 +15,11 @@ cursor.execute("""
     )
 """)
 
+cursor.execute("""
+CREATE INDEX IF NOT EXISTS idx_game_verified
+ON runs(game_name, verified)
+""")
+
 conn.commit()
 conn.close()
 
