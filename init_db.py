@@ -19,6 +19,14 @@ cursor.execute("""
 CREATE INDEX IF NOT EXISTS idx_game_verified
 ON runs(game_name, verified)
 """)
+cursor.execute("""
+CREATE INDEX IF NOT EXISTS idx_verified
+ON runs(verified)
+""")
+cursor.execute("""
+CREATE INDEX IF NOT EXISTS idx_game_name
+ON runs(game_name)
+""")
 
 conn.commit()
 conn.close()
